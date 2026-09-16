@@ -1,0 +1,154 @@
+--==============================================================================
+-- CARTI ADMIN ABUSE - COMPLETE SCRIPT (IMMORTAL, EGG, DYNAMIC USER & BOOSTS)
+--==============================================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+local localPlayer = Players.LocalPlayer
+local playerGui = localPlayer:WaitForChild("PlayerGui")
+
+-- 1. GAME MODULE DEPENDENCIES
+local areas = require(ReplicatedStorage:WaitForChild("Data"):WaitForChild("Areas"))
+local riftSpawnNotification = require(
+    ReplicatedStorage:WaitForChild("Client"):WaitForChild("Notifications"):WaitForChild("RiftSpawn")
+)
+local messageNotification = require(
+    ReplicatedStorage:WaitForChild("Client"):WaitForChild("Notifications"):WaitForChild("Message")
+)
+local smartProximityPrompt = require(
+    ReplicatedStorage:WaitForChild("Client"):WaitForChild("SmartProximityPrompt")
+)
+
+local random = Random.new()
+local ADMIN_USERNAME = localPlayer.Name
+local ADMIN_USER_ID = localPlayer.UserId
+
+-- Verification badge string
+local VERIFIED_BADGE = utf8.char(0xE000)
+
+-- Mapping for Egg Models in ReplicatedStorage
+local EGG_MODEL_NAMES = {
+    Unicorn = "Unicorn",
+    Kitsune = "Kitsune",
+    Nightflame = "Godzilla",
+    Archdemon = "Archdemon Dragon",
+    Dreadscale = "Monster Egg",
+    Mecha = "Mecha Egg",
+    Shattered = "Crystal Egg",
+}
+
+-- Configurable State for Customizations
+local CONFIG = {
+    HeadTagText = "👑 CREATOR 👑",
+    HeadTagColor = Color3.fromRGB(239, 42, 54),
+    CurrentOutfitUserId = ADMIN_USER_ID,
+    Godmode = false,
+}
+
+-- Dynamic Admin Name Update Utility
+local function syncAdminIdentity(targetUserId)
+    pcall(function()
+        local name = Players:GetNameFromUserIdAsync(targetUserId)
+        if name then
+            ADMIN_USERNAME = name
+            ADMIN_USER_ID = targetUserId
+        end
+    end)
+end
+
+--==============================================================================
+-- GODMODE / IMMORTAL SYSTEM
+--==============================================================================
+
+local godmodeConnection = nil
+
+local function toggleGodmode(enable)
+    if enable == nil then
+        CONFIG.Godmode = not CONFIG.Godmode
+    else
+        CONFIG.Godmode = enable
+    end
+
+    if godmodeConnection then
+        godmodeConnection:Disconnect()
+        godmodeConnection = nil
+    end
+
+    if CONFIG.Godmode then
+        godmodeConnection = RunService.Stepped:Connect(function()
+            local char = localPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.MaxHealth = 100000
+                hum.Health = 100000
+            end
+        end)
+    else
+        local char = localPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.MaxHealth = 100
+            hum.Health = 100
+        end
+    end
+end
+
+--==============================================================================
+-- PLAYER EGG CARRY STATE & CENTRAL MANAGER
+--==============================================================================
+
+local carryingEgg = false
+local carriedEggModel = nil
+local carryHeartbeatConnection = nil
+local carryCheckConnection = nil
+
+local function resetPlayerCarryState()
+    if carryHeartbeatConnection then
+        carryHeartbeatConnection:Disconnect()
+        carryHeartbeatConnection = nil
+    end
+    if carryCheckConnection then
+        carryCheckConnection:Disconnect()
+        carryCheckConnection = nil
+    end
+    if carriedEggModel and carriedEggModel.Parent then
+        carriedEggModel:Destroy()
+    end
+    carriedEggModel = nil
+    carryingEgg = false
+end
+
+-- State & Singleton Management
+local identityState = _G.CartiAdminAbuseIdentityState or {}
+if identityState.CharacterAddedConnection then
+    identityState.CharacterAddedConnection:Disconnect()
+end
+_G.CartiAdminAbuseIdentityState = identityState
+
+if _G.CartiAdminAbuseUI then
+    pcall(function() _G.CartiAdminAbuseUI:Destroy() end)
+end
+
+--==============================================================================
+-- AVATAR & HEAD TAG SYSTEM
+--==============================================================================
+
+local function applyCreatorTag(character)
+    local head = character:FindFirstChild("Head") or character:WaitForChild("Head", 5)
+    if not head then return false end
+
+    local oldTag = head:FindFirstChild("CartiCreatorTag")
+    if oldTag then oldTag:Destroy() end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "CartiCreatorTag"
+    billboard.Adornee = head
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
+    billboard.MaxDistance = 150
+    billboard.Size = UD
